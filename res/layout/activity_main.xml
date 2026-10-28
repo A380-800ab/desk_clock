@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- 全屏背景 -->
+    <ImageView
+        android:id="@+id/iv_background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop" />
+
+    <!-- 主界面时间区域 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center">
+        <TextView
+            android:id="@+id/tv_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="20sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="10dp" />
+        <TextView
+            android:id="@+id/tv_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:shadowColor="#00FFCC"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="20"
+            android:textColor="#00FFCC" />
+    </LinearLayout>
+
+    <!-- 右上角齿轮 -->
+    <ImageView
+        android:id="@+id/iv_settings_icon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="20dp"
+        android:padding="8dp"
+        android:background="#44000000"
+        android:src="@android:drawable/ic_menu_preferences"
+        android:visibility="gone" />
+
+    <!-- 遮罩层 -->
+    <View
+        android:id="@+id/view_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:visibility="gone" />
+
+    <!-- 侧边栏：黑底白字极简风 -->
+    <ScrollView
+        android:id="@+id/layout_sidebar"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="#1A1A1A"
+        android:visibility="gone"
+        android:fillViewport="true">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:id="@+id/tv_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="状态：联网"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#00FFCC"
+                android:layout_marginBottom="20dp"/>
+
+            <Button
+                android:id="@+id/btn_timezone"
+                android:layout_width="match_parent"
+                android:layout_height="45dp"
+                android:text="选择时区"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:backgroundTint="#333333"
+                android:layout_marginBottom="20dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="20dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="联网同步时间"
+                    android:textColor="#DDDDDD"
+                    android:textSize="16sp"/>
+                <Switch
+                    android:id="@+id/sw_network"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="字体大小"
+                android:textColor="#DDDDDD"
+                android:textSize="16sp" />
+            <SeekBar
+                android:id="@+id/sb_font_size"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"
+                android:progress="50"
+                android:layout_marginBottom="20dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="颜色 (R/G/B)"
+                android:textColor="#DDDDDD"
+                android:textSize="16sp" />
+            <SeekBar android:id="@+id/sb_red" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="255" />
+            <SeekBar android:id="@+id/sb_green" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="255" />
+            <SeekBar android:id="@+id/sb_blue" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="255" />
+            
+            <View
+                android:id="@+id/view_color_preview"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="10dp"
+                android:background="#00FFCC" />
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>
