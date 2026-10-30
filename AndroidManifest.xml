@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.geek.clock">
+    package="com.geek.clock"
+    android:versionCode="2"
+    android:versionName="1">
 
+    <!-- 基础权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- 版本门槛：最低安卓5.0，目标安卓8.0 -->
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="26" />
 
     <application
@@ -14,7 +18,7 @@
         android:usesCleartextTraffic="true" 
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
         
-        <!-- 强制横屏在 Manifest 和代码里双重声明，万无一失 -->
+        <!-- 主界面：锁定横屏，防止旋转重建 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

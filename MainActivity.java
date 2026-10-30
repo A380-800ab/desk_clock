@@ -2,6 +2,9 @@ package com.geek.clock;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.KeyguardManager;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -35,6 +38,8 @@ public class MainActivity extends Activity {
     private Button btnTimezone;
     private View colorPreview;
     private Handler handler = new Handler(Looper.getMainLooper());
+    private SharedPreferences sp;
+    private KeyguardManager keyguardManager;
 
     private SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd EEEE", Locale.getDefault());
@@ -45,29 +50,67 @@ public class MainActivity extends Activity {
     private boolean isSidebarOpen = false;
     private int currentFontColor = 0xFF00FFCC;
 
+    // 【原汁原味】的三秒隐藏齿轮 Runnable
     private final Runnable hideIconRunnable = () -> ivSettingsIcon.setVisibility(View.GONE);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+        
+        keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+
         getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
         setContentView(R.layout.activity_main);
+        
+        sp = getSharedPreferences("clock_config", Context.MODE_PRIVATE);
+
         initViews();
         setupListeners();
-        
+        loadSettings();
+
         tvStatus.setText("状态：同步中...");
-        syncNetworkTime();
+        if (isNetworkTime) syncNetworkTime();
+        else tvStatus.setText("状态：本地");
 
         startClock();
 
+        // 【原汁原味】启动时显示齿轮，3秒后隐藏
         ivSettingsIcon.setVisibility(View.VISIBLE);
         handler.postDelayed(hideIconRunnable, 3000);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        applyTouchableLogic();
+        if (sp != null) loadSettings();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            applyTouchableLogic();
+        }
+    }
+
+    // 【核心修复】：锁屏时穿透，解锁时不穿透
+    private void applyTouchableLogic() {
+        if (keyguardManager != null && keyguardManager.isKeyguardLocked()) {
+            // 锁屏：幽灵模式，全穿透
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        } else {
+            // 正常状态：实体模式，可点击
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        }
     }
 
     private void initViews() {
@@ -89,11 +132,12 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) sidebar.getLayoutParams();
         params.width = screenWidth / 4;
         sidebar.setLayoutParams(params);
-
+        
         updateColorPreview();
     }
 
     private void setupListeners() {
+        // 【原汁原味】点击屏幕显示齿轮并重置3秒倒计时
         findViewById(android.R.id.content).setOnClickListener(v -> {
             if (!isSidebarOpen) {
                 ivSettingsIcon.setVisibility(View.VISIBLE);
@@ -102,6 +146,7 @@ public class MainActivity extends Activity {
             }
         });
 
+        // 【原汁原味】点齿轮打开侧边栏
         ivSettingsIcon.setOnClickListener(v -> {
             sidebar.setVisibility(View.VISIBLE);
             overlay.setVisibility(View.VISIBLE);
@@ -120,7 +165,6 @@ public class MainActivity extends Activity {
             if (isNetworkTime) {
                 btnTimezone.setEnabled(true);
                 btnTimezone.setAlpha(1.0f);
-                tvStatus.setText("状态：同步中...");
                 syncNetworkTime();
             } else {
                 btnTimezone.setEnabled(false);
@@ -130,11 +174,11 @@ public class MainActivity extends Activity {
                 tvStatus.setText("状态：本地");
                 updateDisplay();
             }
+            saveSettings();
         });
 
         sbFontSize.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 int screenWidth = getResources().getDisplayMetrics().widthPixels;
                 float baseSize = screenWidth * 0.15f;
                 float scale = progress / 50f;
@@ -142,17 +186,16 @@ public class MainActivity extends Activity {
                 tvDate.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, baseSize * scale * 0.3f);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { saveSettings(); }
         });
 
         SeekBar.OnSeekBarChangeListener colorListener = new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 currentFontColor = Color.rgb(sbRed.getProgress(), sbGreen.getProgress(), sbBlue.getProgress());
                 updateColorPreview();
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { saveSettings(); }
         };
         sbRed.setOnSeekBarChangeListener(colorListener);
         sbGreen.setOnSeekBarChangeListener(colorListener);
@@ -181,10 +224,8 @@ public class MainActivity extends Activity {
     private void updateDisplay() {
         long currentTime = System.currentTimeMillis() + (isNetworkTime ? timeOffset : 0);
         Date now = new Date(currentTime);
-        
         String tzId = isNetworkTime ? selectedTimeZoneId : TimeZone.getDefault().getID();
         TimeZone tz = TimeZone.getTimeZone(tzId);
-        
         timeFormat.setTimeZone(tz);
         dateFormat.setTimeZone(tz);
         tvTime.setText(timeFormat.format(now));
@@ -205,21 +246,12 @@ public class MainActivity extends Activity {
                 DatagramPacket response = new DatagramPacket(buffer, buffer.length);
                 socket.receive(response);
                 socket.close();
-
-                long ntpTime = ((long) (buffer[40] & 0xFF) << 24) |
-                        ((long) (buffer[41] & 0xFF) << 16) |
-                        ((long) (buffer[42] & 0xFF) << 8) |
-                        (buffer[43] & 0xFF);
-                long ntpFraction = ((long) (buffer[44] & 0xFF) << 24) |
-                        ((long) (buffer[45] & 0xFF) << 16) |
-                        ((long) (buffer[46] & 0xFF) << 8) |
-                        (buffer[47] & 0xFF);
-
+                long ntpTime = ((long) (buffer[40] & 0xFF) << 24) | ((long) (buffer[41] & 0xFF) << 16) | ((long) (buffer[42] & 0xFF) << 8) | (buffer[43] & 0xFF);
+                long ntpFraction = ((long) (buffer[44] & 0xFF) << 24) | ((long) (buffer[45] & 0xFF) << 16) | ((long) (buffer[46] & 0xFF) << 8) | (buffer[47] & 0xFF);
                 long epoch = (ntpTime - 2208988800L) * 1000L + (ntpFraction * 1000L / 0x100000000L);
                 timeOffset = epoch - System.currentTimeMillis();
                 success = true;
             } catch (Exception ignored) {}
-
             if (!success) {
                 try {
                     URL url = new URL("http://connect.rom.miui.com/generate_204");
@@ -236,50 +268,37 @@ public class MainActivity extends Activity {
                     conn.disconnect();
                 } catch (Exception ignored) {}
             }
-
             final boolean successFinal = success;
             runOnUiThread(() -> {
-                if (isNetworkTime) {
-                    tvStatus.setText(successFinal ? "状态：联网" : "状态：本地(网络异常)");
-                }
+                if (isNetworkTime) tvStatus.setText(successFinal ? "状态：联网" : "状态：本地(网络异常)");
             });
         }).start();
     }
 
-    // ================= 最原始、最纯净的时区列表 =================
     private void showTimezoneDialog() {
         if (!isNetworkTime) return;
-
         String[] allIds = TimeZone.getAvailableIDs();
         final List<String> displayList = new ArrayList<>();
         final List<String> idList = new ArrayList<>();
-
         for (String id : allIds) {
             if (id.contains("/") && !id.startsWith("SystemV") && !id.startsWith("US/")) {
                 TimeZone tz = TimeZone.getTimeZone(id);
                 int offset = tz.getRawOffset();
                 int hours = Math.abs(offset / 3600000);
                 int minutes = Math.abs((offset % 3600000) / 60000);
-                
                 String sign = offset >= 0 ? "+" : "-";
                 String gmt = "GMT" + sign + String.format(Locale.US, "%02d", hours) + ":" + String.format(Locale.US, "%02d", minutes);
-
                 String city = id.substring(id.indexOf("/") + 1).replace("_", " ");
                 String region = id.substring(0, id.indexOf("/"));
-
                 displayList.add(city + " (" + region + ") " + gmt);
                 idList.add(id);
             }
         }
-
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("选择时区");
-
-        // 直接用最纯粹的 ListView，没有任何搜索框
         final ListView listView = new ListView(this);
         listView.setBackgroundColor(Color.parseColor("#111111"));
         listView.setDivider(null);
-        
         final ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, displayList) {
             @Override
             public View getView(int position, View convertView, android.view.ViewGroup parent) {
@@ -290,19 +309,58 @@ public class MainActivity extends Activity {
             }
         };
         listView.setAdapter(adapter);
-
         builder.setView(listView);
         final AlertDialog dialog = builder.create();
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#111111")));
-        }
-
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#111111")));
         listView.setOnItemClickListener((parent, view, position, id) -> {
             selectedTimeZoneId = idList.get(position);
             updateDisplay();
+            saveSettings();
             dialog.dismiss();
         });
-
         dialog.show();
+    }
+
+    private void saveSettings() {
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putInt("font_color", currentFontColor);
+        editor.putInt("font_size", sbFontSize.getProgress());
+        editor.putString("time_zone", selectedTimeZoneId);
+        editor.putBoolean("is_network", isNetworkTime);
+        editor.putInt("red", sbRed.getProgress());
+        editor.putInt("green", sbGreen.getProgress());
+        editor.putInt("blue", sbBlue.getProgress());
+        editor.apply();
+    }
+
+    private void loadSettings() {
+        currentFontColor = sp.getInt("font_color", 0xFF00FFCC);
+        int fontProgress = sp.getInt("font_size", 50);
+        selectedTimeZoneId = sp.getString("time_zone", TimeZone.getDefault().getID());
+        isNetworkTime = sp.getBoolean("is_network", true);
+        int red = sp.getInt("red", 0);
+        int green = sp.getInt("green", 255);
+        int blue = sp.getInt("blue", 204);
+
+        sbRed.setProgress(red);
+        sbGreen.setProgress(green);
+        sbBlue.setProgress(blue);
+        sbFontSize.setProgress(fontProgress);
+        swNetwork.setChecked(isNetworkTime);
+        
+        updateColorPreview();
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        float baseSize = screenWidth * 0.15f;
+        float scale = fontProgress / 50f;
+        tvTime.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, baseSize * scale);
+        tvDate.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, baseSize * scale * 0.3f);
+
+        if (isNetworkTime) {
+            btnTimezone.setEnabled(true);
+            btnTimezone.setAlpha(1.0f);
+        } else {
+            btnTimezone.setEnabled(false);
+            btnTimezone.setAlpha(0.4f);
+        }
     }
 }
